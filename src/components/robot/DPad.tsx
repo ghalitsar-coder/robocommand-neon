@@ -20,12 +20,12 @@ interface DPadProps {
 }
 
 export function DPad({ active, onPress, onRelease }: DPadProps) {
-  const radius = 96;
+  const radius = 86;
   return (
-    <div className="relative w-[240px] h-[240px] mx-auto">
-      {/* center hub */}
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-full border border-neon-cyan/40 bg-surface/60 flex items-center justify-center">
-        <span className="font-mono text-[10px] text-neon-cyan tracking-widest">IDLE</span>
+    <div className="relative w-[220px] h-[220px] mx-auto">
+      <div className="absolute inset-0 rounded-full bg-surface-muted border border-border" />
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 rounded-full border border-border bg-surface flex items-center justify-center">
+        <span className="font-mono text-[10px] text-muted-foreground tracking-wider">IDLE</span>
       </div>
       {dirs.map(({ key, angle, label }) => {
         const rad = ((angle - 90) * Math.PI) / 180;
@@ -39,15 +39,15 @@ export function DPad({ active, onPress, onRelease }: DPadProps) {
             onPointerUp={() => onRelease?.()}
             onPointerLeave={() => onRelease?.()}
             className={cn(
-              "absolute w-14 h-14 rounded-xl border flex flex-col items-center justify-center font-display text-2xl transition-all touch-none clip-corner",
-              "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2",
+              "absolute w-12 h-12 rounded-md border flex flex-col items-center justify-center text-xl transition-all touch-none",
+              "left-1/2 top-1/2",
               isActive
-                ? "bg-gradient-cyan text-primary-foreground border-neon-cyan shadow-neon-cyan scale-110"
-                : "bg-surface/80 border-neon-cyan/30 text-neon-cyan hover:border-neon-cyan/70 hover:bg-surface-elevated active:scale-95",
+                ? "bg-navy text-primary-foreground border-navy shadow-card-md scale-105"
+                : "bg-surface border-border text-foreground hover:border-navy/40 hover:text-navy active:scale-95",
             )}
             style={{ transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))` }}
           >
-            <span className="leading-none">{label}</span>
+            <span className="leading-none font-medium">{label}</span>
             <span className="text-[9px] font-mono opacity-70 mt-0.5 tracking-wider">{key}</span>
           </button>
         );

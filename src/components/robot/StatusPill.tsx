@@ -8,21 +8,21 @@ interface StatusPillProps {
 
 export function StatusPill({ label, tone = "ok", pulse }: StatusPillProps) {
   const map = {
-    ok: "text-neon-green border-neon-green/50 bg-neon-green/10",
-    warn: "text-neon-amber border-neon-amber/50 bg-neon-amber/10",
-    danger: "text-destructive border-destructive/50 bg-destructive/10",
-    idle: "text-muted-foreground border-border bg-muted/30",
+    ok: "text-[color:var(--success)] border-border bg-surface-muted",
+    warn: "text-[color:var(--warning)] border-border bg-surface-muted",
+    danger: "text-destructive border-border bg-surface-muted",
+    idle: "text-muted-foreground border-border bg-surface-muted",
   } as const;
   const dotMap = {
-    ok: "bg-neon-green shadow-[0_0_10px_var(--neon-green)]",
-    warn: "bg-neon-amber shadow-[0_0_10px_var(--neon-amber)]",
-    danger: "bg-destructive shadow-[0_0_10px_oklch(0.65_0.27_25)]",
+    ok: "bg-[color:var(--success)]",
+    warn: "bg-[color:var(--warning)]",
+    danger: "bg-destructive",
     idle: "bg-muted-foreground",
   } as const;
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-2 px-2.5 py-1 rounded-md border font-mono text-[10px] uppercase tracking-widest",
+        "inline-flex items-center gap-2 px-2.5 py-1 rounded-md border font-mono text-[10px] uppercase tracking-wider font-medium",
         map[tone],
       )}
     >
