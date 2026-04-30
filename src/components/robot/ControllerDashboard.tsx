@@ -6,6 +6,7 @@ import { StatusPill } from "./StatusPill";
 import { SensorGauge } from "./SensorGauge";
 import { BatteryIndicator } from "./BatteryIndicator";
 import { cn } from "@/lib/utils";
+import { Zap, Lock, Shield, Wifi, WifiOff } from "lucide-react";
 
 type ControlMode = "joystick" | "dpad";
 
@@ -17,7 +18,6 @@ export function ControllerDashboard() {
   const [dribbling, setDribbling] = useState(false);
   const [kicking, setKicking] = useState(false);
 
-  // simulated telemetry
   const [distance, setDistance] = useState(64);
   const [battery, setBattery] = useState(82);
   const [connected, setConnected] = useState(true);
@@ -32,25 +32,15 @@ export function ControllerDashboard() {
     return () => clearInterval(id);
   }, []);
 
-  // KICK is only safe to fire when dribbler is OPEN (not dribbling = ball released)
   const kickSafe = !dribbling;
 
   const handleKick = () => {
     if (!kickSafe) return;
     setKicking(true);
     setTimeout(() => setKicking(false), 350);
-    // TODO: send WS command { cmd: "kick" }
   };
 
   const ballNear = distance < 12;
-
-  const headerStatus = (
-    <div className="flex flex-wrap items-center gap-2">
-      <StatusPill label={connected ? `LINK ${latency}ms` : "OFFLINE"} tone={connected ? "ok" : "danger"} pulse={connected} />
-      <StatusPill label={`BAT ${battery.toFixed(0)}%`} tone={battery > 50 ? "ok" : battery > 20 ? "warn" : "danger"} />
-      <StatusPill label={ballNear ? "BALL LOCK" : "SCAN"} tone={ballNear ? "warn" : "idle"} pulse={ballNear} />
-    </div>
-  );
 
   const movementLabel = useMemo(() => {
     if (mode === "dpad") return dpadDir ?? "—";
@@ -61,215 +51,236 @@ export function ControllerDashboard() {
   }, [mode, dpadDir, vector]);
 
   return (
-    <div className="relative min-h-screen w-full px-4 py-5 sm:px-6 sm:py-8 max-w-7xl mx-auto">
-      {/* Header */}
-      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3">
-          <div className="relative h-11 w-11 rounded-lg bg-gradient-cyan flex items-center justify-center font-display text-xl text-primary-foreground shadow-neon-cyan">
-            R3
+    <div className="min-h-screen w-full bg-background">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-10">
+        {/* Header */}
+        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 pb-6 border-b border-border">
+          <div className="flex items-center gap-4">
+            <div className="h-11 w-11 rounded-md bg-navy flex items-center justify-center text-primary-foreground font-semibold text-sm tracking-wide">
+              R3
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
+                Omni Robot Controller
+              </h1>
+              <p className="label-eyebrow mt-0.5">
+                Unit · OMNI-3 · ws://192.168.4.1:81
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="font-display text-2xl sm:text-3xl tracking-widest text-glow-cyan text-neon-cyan">
-              OMNI&nbsp;CONTROL
-            </h1>
-            <p className="font-mono text-[10px] text-muted-foreground tracking-widest">
-              3-WHEEL OMNI · ESP32 · WS://192.168.4.1:81
-            </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusPill
+              label={connected ? `Online · ${latency}ms` : "Offline"}
+              tone={connected ? "ok" : "danger"}
+              pulse={connected}
+            />
+            <StatusPill
+              label={`Battery ${battery.toFixed(0)}%`}
+              tone={battery > 50 ? "ok" : battery > 20 ? "warn" : "danger"}
+            />
+            <StatusPill
+              label={ballNear ? "Ball detected" : "Scanning"}
+              tone={ballNear ? "warn" : "idle"}
+              pulse={ballNear}
+            />
           </div>
+        </header>
+
+        <div className="grid gap-5 lg:gap-6 grid-cols-1 lg:grid-cols-12">
+          {/* Drive Control */}
+          <CyberCard
+            eyebrow="01 · Navigation"
+            title="Drive Control"
+            className="lg:col-span-7"
+            status={
+              <div className="inline-flex bg-surface-muted rounded-md p-0.5 border border-border">
+                {(["joystick", "dpad"] as ControlMode[]).map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setMode(m)}
+                    className={cn(
+                      "px-3 py-1 rounded text-xs font-medium capitalize transition",
+                      mode === m
+                        ? "bg-surface text-navy shadow-card"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
+            }
+          >
+            <div className="grid sm:grid-cols-[1fr_auto] gap-8 items-center">
+              <div className="flex justify-center py-2">
+                {mode === "joystick" ? (
+                  <Joystick onChange={setVector} />
+                ) : (
+                  <DPad
+                    active={dpadDir}
+                    onPress={(d) => setDpadDir(d)}
+                    onRelease={() => setDpadDir(null)}
+                  />
+                )}
+              </div>
+
+              <dl className="grid grid-cols-2 sm:grid-cols-1 gap-2 text-sm min-w-[180px]">
+                <Readout label="Direction" value={movementLabel} accent />
+                <Readout label="Vx" value={(mode === "joystick" ? vector.x : 0).toFixed(2)} />
+                <Readout label="Vy" value={(mode === "joystick" ? vector.y : 0).toFixed(2)} />
+                <Readout
+                  label="Throttle"
+                  value={`${(mode === "joystick" ? vector.magnitude * 100 : dpadDir ? 100 : 0).toFixed(0)}%`}
+                />
+                <Readout label="Heading" value={`${mode === "joystick" ? vector.angle.toFixed(0) : 0}°`} />
+              </dl>
+            </div>
+          </CyberCard>
+
+          {/* Actuators */}
+          <CyberCard eyebrow="02 · Actuators" title="Manipulation" className="lg:col-span-5">
+            <div className="space-y-4">
+              {/* Dribbler */}
+              <button
+                onClick={() => setDribbling((d) => !d)}
+                className="w-full text-left rounded-md border border-border bg-surface hover:border-navy/40 p-4 transition-colors"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="label-eyebrow">Servo</div>
+                    <div className="text-base font-semibold text-foreground mt-0.5">Dribbler</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {dribbling ? "Engaged — holding ball" : "Open — ready to release"}
+                    </div>
+                  </div>
+                  {/* Sleek toggle */}
+                  <div
+                    className={cn(
+                      "relative h-7 w-12 rounded-full transition-colors shrink-0",
+                      dribbling ? "bg-navy" : "bg-border",
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        "absolute top-0.5 h-6 w-6 rounded-full bg-white shadow-card transition-transform",
+                        dribbling ? "translate-x-[22px]" : "translate-x-0.5",
+                      )}
+                    />
+                  </div>
+                </div>
+              </button>
+
+              {/* KICK */}
+              <button
+                onClick={handleKick}
+                disabled={!kickSafe}
+                className={cn(
+                  "relative w-full rounded-md p-5 transition-all overflow-hidden border",
+                  kickSafe
+                    ? "bg-navy border-navy text-primary-foreground hover:opacity-95 active:scale-[0.99]"
+                    : "bg-surface-muted border-border text-muted-foreground cursor-not-allowed",
+                  kicking && "scale-[0.98]",
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="text-left">
+                    <div className="text-xs font-mono uppercase tracking-[0.18em] opacity-80">
+                      Solenoid
+                    </div>
+                    <div className="text-2xl font-semibold tracking-tight mt-1">
+                      {kicking ? "Firing…" : "Kick"}
+                    </div>
+                    <div className="text-xs mt-1.5 opacity-80 flex items-center gap-1.5">
+                      {kickSafe ? (
+                        <>
+                          <Shield className="h-3 w-3" />
+                          Armed — interlock cleared
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="h-3 w-3" />
+                          Disabled — open dribbler first
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <div
+                    className={cn(
+                      "h-12 w-12 rounded-full flex items-center justify-center border",
+                      kickSafe ? "border-white/25 bg-white/10" : "border-border bg-surface",
+                    )}
+                  >
+                    {kickSafe ? <Zap className="h-5 w-5" /> : <Lock className="h-5 w-5" />}
+                  </div>
+                </div>
+              </button>
+
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span
+                  className={cn(
+                    "h-1.5 w-1.5 rounded-full",
+                    kickSafe ? "bg-[color:var(--success)]" : "bg-destructive",
+                  )}
+                />
+                Safety interlock: kick requires dribbler open
+              </div>
+            </div>
+          </CyberCard>
+
+          {/* Sensor */}
+          <CyberCard eyebrow="03 · Telemetry" title="Ultrasonic Sensor" className="lg:col-span-7">
+            <SensorGauge distance={distance} />
+          </CyberCard>
+
+          {/* Power & Link */}
+          <CyberCard eyebrow="04 · System" title="Power & Link" className="lg:col-span-5">
+            <div className="space-y-5">
+              <BatteryIndicator level={battery} voltage={6.8 + (battery / 100) * 1.6} />
+
+              <div className="border-t border-border pt-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="label-eyebrow">WebSocket Link</span>
+                  <button
+                    onClick={() => setConnected((c) => !c)}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded border transition-colors",
+                      connected
+                        ? "border-border text-[color:var(--success)] hover:bg-surface-muted"
+                        : "border-border text-destructive hover:bg-surface-muted",
+                    )}
+                  >
+                    {connected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+                    {connected ? "Connected" : "Disconnected"}
+                  </button>
+                </div>
+                <dl className="grid grid-cols-2 gap-2 text-sm">
+                  <Readout label="Latency" value={`${latency} ms`} />
+                  <Readout label="RSSI" value="-54 dB" />
+                  <Readout label="Host" value="esp32-r3" />
+                  <Readout label="Channel" value="6" />
+                </dl>
+              </div>
+            </div>
+          </CyberCard>
         </div>
-        {headerStatus}
-      </header>
 
-      <div className="grid gap-4 lg:gap-6 grid-cols-1 lg:grid-cols-12">
-        {/* Movement card */}
-        <CyberCard
-          title="Drive Control"
-          accent="cyan"
-          className="lg:col-span-7"
-          status={
-            <div className="flex gap-1 bg-background/60 rounded-md p-0.5 border border-border/60">
-              {(["joystick", "dpad"] as ControlMode[]).map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setMode(m)}
-                  className={cn(
-                    "px-2.5 py-1 rounded-sm font-mono text-[10px] uppercase tracking-widest transition",
-                    mode === m
-                      ? "bg-neon-cyan text-primary-foreground shadow-neon-cyan"
-                      : "text-muted-foreground hover:text-neon-cyan",
-                  )}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
-          }
-        >
-          <div className="grid sm:grid-cols-[1fr_auto] gap-6 items-center">
-            <div className="flex justify-center py-4">
-              {mode === "joystick" ? (
-                <Joystick onChange={setVector} />
-              ) : (
-                <DPad
-                  active={dpadDir}
-                  onPress={(d) => setDpadDir(d)}
-                  onRelease={() => setDpadDir(null)}
-                />
-              )}
-            </div>
-
-            {/* telemetry readout */}
-            <div className="grid grid-cols-2 sm:grid-cols-1 gap-2 font-mono text-xs min-w-[180px]">
-              <Readout label="DIR" value={movementLabel} accent />
-              <Readout label="VX" value={(mode === "joystick" ? vector.x : 0).toFixed(2)} />
-              <Readout label="VY" value={(mode === "joystick" ? vector.y : 0).toFixed(2)} />
-              <Readout
-                label="THR"
-                value={`${(mode === "joystick" ? vector.magnitude * 100 : dpadDir ? 100 : 0).toFixed(0)}%`}
-              />
-              <Readout label="HDG" value={`${mode === "joystick" ? vector.angle.toFixed(0) : 0}°`} />
-            </div>
-          </div>
-        </CyberCard>
-
-        {/* Action buttons */}
-        <CyberCard title="Actuators" accent="magenta" className="lg:col-span-5">
-          <div className="grid gap-4">
-            {/* Dribbler toggle */}
-            <button
-              onClick={() => setDribbling((d) => !d)}
-              className={cn(
-                "group relative w-full rounded-lg border-2 px-4 py-5 transition-all clip-corner overflow-hidden",
-                dribbling
-                  ? "bg-gradient-green border-neon-green shadow-neon-green"
-                  : "bg-surface/80 border-neon-green/40 hover:border-neon-green",
-              )}
-            >
-              <div className="flex items-center justify-between">
-                <div className="text-left">
-                  <div
-                    className={cn(
-                      "font-display text-lg tracking-widest",
-                      dribbling ? "text-background" : "text-neon-green text-glow-green",
-                    )}
-                  >
-                    DRIBBLER
-                  </div>
-                  <div
-                    className={cn(
-                      "font-mono text-[10px] uppercase tracking-widest mt-1",
-                      dribbling ? "text-background/80" : "text-muted-foreground",
-                    )}
-                  >
-                    {dribbling ? "● ENGAGED · BALL HELD" : "○ OPEN · READY TO RELEASE"}
-                  </div>
-                </div>
-                <div
-                  className={cn(
-                    "h-12 w-12 rounded-full border-2 flex items-center justify-center font-display",
-                    dribbling
-                      ? "bg-background/30 border-background text-background"
-                      : "border-neon-green/60 text-neon-green",
-                  )}
-                >
-                  {dribbling ? "ON" : "OFF"}
-                </div>
-              </div>
-            </button>
-
-            {/* KICK button */}
-            <button
-              onClick={handleKick}
-              disabled={!kickSafe}
-              className={cn(
-                "relative w-full rounded-lg border-2 px-4 py-7 transition-all overflow-hidden clip-corner select-none",
-                kickSafe
-                  ? "bg-gradient-danger border-neon-magenta text-background animate-pulse-glow active:scale-[0.98]"
-                  : "bg-muted/40 border-border text-muted-foreground cursor-not-allowed",
-                kicking && "scale-95",
-              )}
-            >
-              <div className="flex items-center justify-between relative z-10">
-                <div className="text-left">
-                  <div className="font-display text-3xl sm:text-4xl tracking-[0.3em]">
-                    {kicking ? "FIRE!" : "KICK"}
-                  </div>
-                  <div className="font-mono text-[10px] uppercase tracking-widest mt-1 opacity-80">
-                    {kickSafe ? "● SAFETY OFF · SOLENOID ARMED" : "⚠ DISABLED · OPEN DRIBBLER FIRST"}
-                  </div>
-                </div>
-                <div className="font-display text-3xl">
-                  {kickSafe ? "⚡" : "🔒"}
-                </div>
-              </div>
-              {kickSafe && (
-                <div
-                  className="absolute inset-x-0 top-0 h-px animate-scan"
-                  style={{ background: "linear-gradient(90deg, transparent, white, transparent)" }}
-                />
-              )}
-            </button>
-
-            <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-              <span className={cn("h-1.5 w-1.5 rounded-full", kickSafe ? "bg-neon-green" : "bg-destructive")} />
-              Interlock: Kick requires dribbler in OPEN state
-            </div>
-          </div>
-        </CyberCard>
-
-        {/* Sensor */}
-        <CyberCard title="Ultrasonic Sensor" accent="amber" className="lg:col-span-7">
-          <SensorGauge distance={distance} />
-        </CyberCard>
-
-        {/* Battery & link */}
-        <CyberCard title="Power & Link" accent="green" className="lg:col-span-5">
-          <div className="space-y-5">
-            <BatteryIndicator level={battery} voltage={6.8 + (battery / 100) * 1.6} />
-            <div className="border-t border-border/60 pt-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                  WebSocket
-                </span>
-                <button
-                  onClick={() => setConnected((c) => !c)}
-                  className={cn(
-                    "font-mono text-[10px] uppercase tracking-widest px-2 py-1 rounded border",
-                    connected
-                      ? "border-neon-green/50 text-neon-green"
-                      : "border-destructive/60 text-destructive",
-                  )}
-                >
-                  {connected ? "● CONNECTED" : "○ DISCONNECTED"}
-                </button>
-              </div>
-              <div className="grid grid-cols-2 gap-2 font-mono text-xs">
-                <Readout label="LAT" value={`${latency}ms`} />
-                <Readout label="RSSI" value="-54dB" />
-                <Readout label="HOST" value="esp32-r3" />
-                <Readout label="CH" value="6" />
-              </div>
-            </div>
-          </div>
-        </CyberCard>
+        <footer className="mt-10 pt-5 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
+          <span className="font-mono tracking-wider">SYS · OMNI3 · v0.1.0</span>
+          <span className="font-mono tracking-wider">Control loop · 50 Hz</span>
+        </footer>
       </div>
-
-      <footer className="mt-8 flex items-center justify-between font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-        <span>SYS · OMNI3 · v0.1.0</span>
-        <span className="text-neon-cyan/70">// MAIN.LOOP @ 50Hz</span>
-      </footer>
     </div>
   );
 }
 
 function Readout({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
-    <div className="flex items-center justify-between bg-background/60 border border-border/60 rounded px-2.5 py-1.5">
-      <span className="text-muted-foreground">{label}</span>
+    <div className="flex items-center justify-between bg-surface-muted border border-border rounded px-3 py-2">
+      <span className="label-eyebrow">{label}</span>
       <span
         className={cn(
-          "tabular-nums font-display tracking-widest",
-          accent ? "text-neon-cyan text-glow-cyan" : "text-foreground",
+          "tabular-nums text-sm font-medium",
+          accent ? "text-navy font-semibold" : "text-foreground",
         )}
       >
         {value}
