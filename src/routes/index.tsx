@@ -1,26 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { ControllerDashboard } from "@/components/robot/ControllerDashboard";
 
 export const Route = createFileRoute("/")({
   component: Index,
+  head: () => ({
+    meta: [
+      { title: "Omni Control · 3-Wheel Soccer Robot Dashboard" },
+      {
+        name: "description",
+        content:
+          "Cyberpunk dark-mode controller for a 3-wheel omnidirectional soccer robot — joystick drive, dribbler toggle, kick solenoid, and live ESP32 WebSocket telemetry.",
+      },
+    ],
+  }),
 });
 
-// IMPORTANT: Replace this placeholder. For sites with multiple pages (About, Services, Contact, etc.),
-// create separate route files (about.tsx, services.tsx, contact.tsx) — don't put all pages in this file.
-function PlaceholderIndex() {
-  return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
-  );
-}
-
 function Index() {
-  return <PlaceholderIndex />;
+  return <ControllerDashboard />;
 }
