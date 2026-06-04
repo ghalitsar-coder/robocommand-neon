@@ -7,6 +7,8 @@ import { SensorGauge } from "./SensorGauge";
 import { BatteryIndicator } from "./BatteryIndicator";
 import { cn } from "@/lib/utils";
 import { Zap, Lock, Shield, Wifi, WifiOff } from "lucide-react";
+import { useMqttPublisher } from "@/hooks/useMqttPublisher";
+import { ROBOT_MOVE_TOPIC, vectorToCsv, directionToCsv } from "@/lib/robotCommands";
 
 type ControlMode = "joystick" | "dpad";
 
@@ -20,8 +22,9 @@ export function ControllerDashboard() {
 
   const [distance, setDistance] = useState(64);
   const [battery, setBattery] = useState(82);
-  const [connected, setConnected] = useState(true);
   const [latency, setLatency] = useState(18);
+
+  const { status: mqttStatus, connected: mqttConnected, publish } = useMqttPublisher();
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -32,11 +35,49 @@ export function ControllerDashboard() {
     return () => clearInterval(id);
   }, []);
 
+  // Publish joystick movement sebagai CSV vector
+  useEffect(() => {
+    if (!mqttConnected) return;
+    if (vector.magnitude < 0.05) {
+      publish("robot/drive/vector", "0.00,0.00");
+      return;
+    }
+    // vector.x, vector.y sudah kartesian dari Joystick component (-1..1)
+    // Di joystick web: y negatif = atas. ESP32: vy positif = maju. Jadi invert y.
+    const vx = Math.max(-1, Math.min(1, vector.x)).toFixed(2);
+    const vy = Math.max(-1, Math.min(1, -vector.y)).toFixed(2);
+    const csvPayload = `${vx},${vy}`;
+    console.log("[MQTT_PUBLISH] robot/drive/vector", csvPayload);
+    publish("robot/drive/vector", csvPayload);
+  }, [vector.x, vector.y, vector.magnitude, mqttConnected, publish]);
+
+  // Publish dpad movement sebagai CSV vector
+  useEffect(() => {
+    if (!mqttConnected) return;
+    if (dpadDir === null) {
+      console.log("[MQTT_PUBLISH] robot/drive/vector", "0.00,0.00");
+      publish("robot/drive/vector", "0.00,0.00");
+      return;
+    }
+    const csvPayload = directionToCsv(dpadDir);
+    console.log("[MQTT_PUBLISH] robot/drive/vector", csvPayload);
+    publish("robot/drive/vector", csvPayload);
+  }, [dpadDir, mqttConnected, publish]);
+
+  useEffect(() => {
+    if (!mqttConnected) return;
+    const payload = dribbling ? "LOCK" : "RELEASE";
+    console.log("[MQTT_PUBLISH] robot/action/dribble", payload);
+    publish("robot/action/dribble", payload);
+  }, [dribbling, mqttConnected, publish]);
+
   const kickSafe = !dribbling;
 
   const handleKick = () => {
     if (!kickSafe) return;
     setKicking(true);
+    console.log("[MQTT_PUBLISH] robot/action/kick", "KICK");
+    publish("robot/action/kick", "KICK");
     setTimeout(() => setKicking(false), 350);
   };
 
@@ -64,15 +105,15 @@ export function ControllerDashboard() {
                 Omni Robot Controller
               </h1>
               <p className="label-eyebrow mt-0.5">
-                Unit · OMNI-3 · ws://192.168.4.1:81
+                Unit · OMNI-3 · wss://broker.hivemq.com:8000/mqtt
               </p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <StatusPill
-              label={connected ? `Online · ${latency}ms` : "Offline"}
-              tone={connected ? "ok" : "danger"}
-              pulse={connected}
+              label={mqttConnected ? `MQTT · ${latency}ms` : "MQTT Offline"}
+              tone={mqttConnected ? "ok" : "danger"}
+              pulse={mqttConnected}
             />
             <StatusPill
               label={`Battery ${battery.toFixed(0)}%`}
@@ -239,25 +280,24 @@ export function ControllerDashboard() {
 
               <div className="border-t border-border pt-5 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="label-eyebrow">WebSocket Link</span>
-                  <button
-                    onClick={() => setConnected((c) => !c)}
+                  <span className="label-eyebrow">MQTT Link</span>
+                  <div
                     className={cn(
-                      "inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded border transition-colors",
-                      connected
-                        ? "border-border text-[color:var(--success)] hover:bg-surface-muted"
-                        : "border-border text-destructive hover:bg-surface-muted",
+                      "inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded border",
+                      mqttConnected
+                        ? "border-border text-[color:var(--success)]"
+                        : "border-border text-destructive",
                     )}
                   >
-                    {connected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-                    {connected ? "Connected" : "Disconnected"}
-                  </button>
+                    {mqttConnected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+                    {mqttConnected ? "Connected" : "Disconnected"}
+                  </div>
                 </div>
                 <dl className="grid grid-cols-2 gap-2 text-sm">
+                  <Readout label="Status" value={mqttStatus} />
+                  <Readout label="Topic" value={ROBOT_MOVE_TOPIC} />
                   <Readout label="Latency" value={`${latency} ms`} />
                   <Readout label="RSSI" value="-54 dB" />
-                  <Readout label="Host" value="esp32-r3" />
-                  <Readout label="Channel" value="6" />
                 </dl>
               </div>
             </div>
