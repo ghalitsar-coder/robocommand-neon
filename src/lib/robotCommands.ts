@@ -28,17 +28,18 @@ export const directionCommandMap: Record<Direction, RobotMoveCommand> = {
 
 // Baru: mapping dari command Bahasa ke vector (vx, vy)
 export const commandToVector: Record<RobotMoveCommand, { vx: number; vy: number }> = {
-  maju: { vx: 0, vy: 1 },
-  mundur: { vx: 0, vy: -1 },
-  geserKanan: { vx: 1, vy: 0 },
-  geserKiri: { vx: -1, vy: 0 },
-  serongKananDepan: { vx: 0.5, vy: 0.5 },
-  serongKiriDepan: { vx: -0.5, vy: 0.5 },
-  serongKananBelakang: { vx: 0.5, vy: -0.5 },
-  serongKiriBelakang: { vx: -0.5, vy: -0.5 },
-  putarKanan: { vx: 0.5, vy: 0 },
-  putarKiri: { vx: -0.5, vy: 0 },
-  berhenti: { vx: 0, vy: 0 },
+  // Firmware: vy positif = mundur (South), vy negatif = maju (North)
+  maju:             { vx: 0,    vy: -1 },
+  mundur:           { vx: 0,    vy: 1 },
+  geserKanan:       { vx: 1,    vy: 0 },
+  geserKiri:        { vx: -1,   vy: 0 },
+  serongKananDepan:  { vx: 0.5,  vy: -0.5 },
+  serongKiriDepan:   { vx: -0.5, vy: -0.5 },
+  serongKananBelakang:{ vx: 0.5, vy: 0.5 },
+  serongKiriBelakang: { vx: -0.5,vy: 0.5 },
+  putarKanan:        { vx: 0.5,  vy: 0 },
+  putarKiri:         { vx: -0.5, vy: 0 },
+  berhenti:          { vx: 0,    vy: 0 },
 };
 
 // Baru: Function untuk mengkonversi command ke format CSV yang diterima ESP32

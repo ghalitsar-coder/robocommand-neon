@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CyberCard } from "./CyberCard";
 import { Joystick, JoystickVector } from "./Joystick";
 import { DPad, Direction } from "./DPad";
@@ -42,8 +42,8 @@ export function ControllerDashboard() {
       publish("robot/drive/vector", "0.00,0.00");
       return;
     }
-    // vector.x, vector.y sudah kartesian dari Joystick component (-1..1)
-    // Di joystick web: y negatif = atas. ESP32: vy positif = maju. Jadi invert y.
+    // Joystick.tsx output: y = -ny (ny = dy/max). Drag up: dy<0 → ny<0 → y>0.
+    // Firmware: vy positif = mundur (South), vy negatif = maju (North). Invert y.
     const vx = Math.max(-1, Math.min(1, vector.x)).toFixed(2);
     const vy = Math.max(-1, Math.min(1, -vector.y)).toFixed(2);
     const csvPayload = `${vx},${vy}`;
@@ -70,6 +70,24 @@ export function ControllerDashboard() {
     console.log("[MQTT_PUBLISH] robot/action/dribble", payload);
     publish("robot/action/dribble", payload);
   }, [dribbling, mqttConnected, publish]);
+
+  // Rotation buttons
+  const rotateRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const startRotate = (omega: number) => {
+    if (!mqttConnected) return;
+    publish("robot/drive/rotate", omega.toFixed(2));
+  };
+  const stopRotate = () => {
+    if (!mqttConnected) return;
+    publish("robot/drive/rotate", "0.00");
+  };
+  const spin180 = () => {
+    if (!mqttConnected) return;
+    publish("robot/drive/rotate", "0.60");
+    if (rotateRef.current) clearTimeout(rotateRef.current);
+    rotateRef.current = setTimeout(() => publish("robot/drive/rotate", "0.00"), 1000);
+  };
 
   const kickSafe = !dribbling;
 
@@ -264,6 +282,38 @@ export function ControllerDashboard() {
                   )}
                 />
                 Safety interlock: kick requires dribbler open
+              </div>
+
+              {/* Rotation */}
+              <div className="border-t border-border pt-4 mt-2">
+                <div className="label-eyebrow mb-2">Rotation</div>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onPointerDown={() => startRotate(-0.5)}
+                    onPointerUp={stopRotate}
+                    onPointerLeave={stopRotate}
+                    className="rounded-md border border-border bg-surface hover:border-navy/40 p-3 text-center transition-colors select-none touch-none"
+                  >
+                    <div className="text-lg font-semibold text-foreground">↺</div>
+                    <div className="text-[10px] text-muted-foreground mt-0.5">CCW</div>
+                  </button>
+                  <button
+                    onClick={spin180}
+                    className="rounded-md border border-border bg-surface hover:border-navy/40 p-3 text-center transition-colors select-none touch-none"
+                  >
+                    <div className="text-lg font-semibold text-foreground">⟳ 180°</div>
+                    <div className="text-[10px] text-muted-foreground mt-0.5">SPIN</div>
+                  </button>
+                  <button
+                    onPointerDown={() => startRotate(0.5)}
+                    onPointerUp={stopRotate}
+                    onPointerLeave={stopRotate}
+                    className="rounded-md border border-border bg-surface hover:border-navy/40 p-3 text-center transition-colors select-none touch-none"
+                  >
+                    <div className="text-lg font-semibold text-foreground">↻</div>
+                    <div className="text-[10px] text-muted-foreground mt-0.5">CW</div>
+                  </button>
+                </div>
               </div>
             </div>
           </CyberCard>
