@@ -8,7 +8,8 @@ import { BatteryIndicator } from "./BatteryIndicator";
 import { cn } from "@/lib/utils";
 import { Zap, Lock, Shield, Wifi, WifiOff } from "lucide-react";
 import { useMqttPublisher } from "@/hooks/useMqttPublisher";
-import { ROBOT_MOVE_TOPIC, vectorToCsv, directionToCsv } from "@/lib/robotCommands";
+import { vectorToCsv, directionToCsv } from "@/lib/robotCommands";
+import { TOPICS, IS_PRODUCTION } from "@/lib/topicConfig";
 
 type ControlMode = "joystick" | "dpad";
 
@@ -39,7 +40,7 @@ export function ControllerDashboard() {
   useEffect(() => {
     if (!mqttConnected) return;
     if (vector.magnitude < 0.05) {
-      publish("robot/drive/vector", "0.00,0.00");
+      publish(TOPICS.move, "0.00,0.00");
       return;
     }
     // Joystick.tsx output: y = -ny (ny = dy/max). Drag up: dy<0 → ny<0 → y>0.
@@ -47,28 +48,32 @@ export function ControllerDashboard() {
     const vx = Math.max(-1, Math.min(1, vector.x)).toFixed(2);
     const vy = Math.max(-1, Math.min(1, -vector.y)).toFixed(2);
     const csvPayload = `${vx},${vy}`;
-    console.log("[MQTT_PUBLISH] robot/drive/vector", csvPayload);
-    publish("robot/drive/vector", csvPayload);
+    console.log("[MQTT_PUBLISH]", TOPICS.move, csvPayload);
+    publish(TOPICS.move, csvPayload);
   }, [vector.x, vector.y, vector.magnitude, mqttConnected, publish]);
 
   // Publish dpad movement sebagai CSV vector
   useEffect(() => {
     if (!mqttConnected) return;
     if (dpadDir === null) {
-      console.log("[MQTT_PUBLISH] robot/drive/vector", "0.00,0.00");
-      publish("robot/drive/vector", "0.00,0.00");
+      publish(TOPICS.move, "0.00,0.00");
       return;
     }
     const csvPayload = directionToCsv(dpadDir);
-    console.log("[MQTT_PUBLISH] robot/drive/vector", csvPayload);
-    publish("robot/drive/vector", csvPayload);
+    publish(TOPICS.move, csvPayload);
+
+    const interval = setInterval(() => {
+      publish(TOPICS.move, csvPayload);
+    }, 400);
+
+    return () => clearInterval(interval);
   }, [dpadDir, mqttConnected, publish]);
 
   useEffect(() => {
-    if (!mqttConnected) return;
+    if (!mqttConnected || !TOPICS.dribble) return;
     const payload = dribbling ? "LOCK" : "RELEASE";
-    console.log("[MQTT_PUBLISH] robot/action/dribble", payload);
-    publish("robot/action/dribble", payload);
+    console.log("[MQTT_PUBLISH]", TOPICS.dribble, payload);
+    publish(TOPICS.dribble, payload);
   }, [dribbling, mqttConnected, publish]);
 
   // Rotation buttons
@@ -76,17 +81,17 @@ export function ControllerDashboard() {
 
   const startRotate = (omega: number) => {
     if (!mqttConnected) return;
-    publish("robot/drive/rotate", omega.toFixed(2));
+    publish(TOPICS.rotate, omega.toFixed(2));
   };
   const stopRotate = () => {
     if (!mqttConnected) return;
-    publish("robot/drive/rotate", "0.00");
+    publish(TOPICS.rotate, "0.00");
   };
   const spin180 = () => {
     if (!mqttConnected) return;
-    publish("robot/drive/rotate", "0.60");
+    publish(TOPICS.rotate, "0.60");
     if (rotateRef.current) clearTimeout(rotateRef.current);
-    rotateRef.current = setTimeout(() => publish("robot/drive/rotate", "0.00"), 1000);
+    rotateRef.current = setTimeout(() => publish(TOPICS.rotate, "0.00"), 1000);
   };
 
   const kickSafe = !dribbling;
@@ -94,8 +99,9 @@ export function ControllerDashboard() {
   const handleKick = () => {
     if (!kickSafe) return;
     setKicking(true);
-    console.log("[MQTT_PUBLISH] robot/action/kick", "KICK");
-    publish("robot/action/kick", "KICK");
+    const kickPayload = IS_PRODUCTION ? "tendang" : "KICK";
+    console.log("[MQTT_PUBLISH]", TOPICS.kick, kickPayload);
+    publish(TOPICS.kick, kickPayload);
     setTimeout(() => setKicking(false), 350);
   };
 
@@ -200,7 +206,7 @@ export function ControllerDashboard() {
           <CyberCard eyebrow="02 · Actuators" title="Manipulation" className="lg:col-span-5">
             <div className="space-y-4">
               {/* Dribbler */}
-              <button
+              {TOPICS.dribble && <button
                 onClick={() => setDribbling((d) => !d)}
                 className="w-full text-left rounded-md border border-border bg-surface hover:border-navy/40 p-4 transition-colors"
               >
@@ -227,7 +233,7 @@ export function ControllerDashboard() {
                     />
                   </div>
                 </div>
-              </button>
+              </button>}
 
               {/* KICK */}
               <button
@@ -345,7 +351,7 @@ export function ControllerDashboard() {
                 </div>
                 <dl className="grid grid-cols-2 gap-2 text-sm">
                   <Readout label="Status" value={mqttStatus} />
-                  <Readout label="Topic" value={ROBOT_MOVE_TOPIC} />
+                  <Readout label="Topic" value={TOPICS.move} />
                   <Readout label="Latency" value={`${latency} ms`} />
                   <Readout label="RSSI" value="-54 dB" />
                 </dl>
